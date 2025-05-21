@@ -21,6 +21,14 @@ Thumbs.db
 # 忽略数据库文件
 *.db
 *.sqlite
+*.sqlite3
 
 # 忽略 node_modules（前端项目）
 node_modules/
+
+
+# 忽略所有一级UUID目录
+/[0-9a-fA-F]*-[0-9a-fA-F]*-[0-9a-fA-F]*-[0-9a-fA-F]*-[0-9a-fA-F]*/
+
+
+test/

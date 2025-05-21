@@ -11,24 +11,25 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import app_config
+
+# 设置正确的项目根目录路径
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# 创建vanna实例
 from vanna_llm_factory import create_vanna_instance
 
 vn = create_vanna_instance()
 
-def get_default_embedding_model():
-    """获取系统默认的Embedding模型名称"""
-    # 从Vanna对象获取
-    if hasattr(vn, 'get_default_embedding_model'):
-        return vn.get_default_embedding_model()
-    # 从配置获取
-    elif hasattr(app_config, 'DEFAULT_EMBEDDING_MODEL'):
-        return app_config.DEFAULT_EMBEDDING_MODEL
-    # 最后的备选值
-    return "bge-large-zh"
-
-# 使用函数获取默认值
-embedding_model = get_default_embedding_model()
-print(f"\n===== 当前使用的Embedding模型: {embedding_model} =====")
+# 直接从配置文件获取模型名称
+embedding_model = app_config.EMBEDDING_CONFIG.get('model_name')
+print(f"\n===== Embedding模型信息 =====")
+print(f"模型名称: {embedding_model}")
+if hasattr(app_config, 'EMBEDDING_CONFIG'):
+    if 'embedding_dimension' in app_config.EMBEDDING_CONFIG:
+        print(f"向量维度: {app_config.EMBEDDING_CONFIG['embedding_dimension']}")
+    if 'base_url' in app_config.EMBEDDING_CONFIG:
+        print(f"API服务: {app_config.EMBEDDING_CONFIG['base_url']}")
+print("==============================")
 
 # 从app_config获取其他配置
 BATCH_PROCESSING_ENABLED = app_config.BATCH_PROCESSING_ENABLED
@@ -213,41 +214,8 @@ SQL: {sql}
             # 尝试使用generate_text方法
             question = vn.generate_text(prompt)
         else:
-            # 如果无法调用大模型，使用基于规则的方法生成问题
-            print("[INFO] 无法调用大模型生成问题，使用规则方法生成")
-            
-            # 使用注释作为基本问题
-            if comment_info:
-                question = comment_info
-                if not question.endswith("?"):
-                    question += "?"
-            else:
-                # 使用基于SQL结构的规则生成问题
-                if "SELECT" in sql.upper():
-                    if "COUNT" in sql.upper():
-                        question = "如何统计指定条件的记录数量？"
-                    elif "SUM" in sql.upper() or "AVG" in sql.upper():
-                        question = "如何计算字段的汇总值？"
-                    elif "GROUP BY" in sql.upper():
-                        question = "如何按分组统计数据？"
-                    elif "JOIN" in sql.upper():
-                        question = "如何连接多个表查询数据？"
-                    elif "ORDER BY" in sql.upper():
-                        question = "如何对查询结果进行排序？"
-                    else:
-                        question = "如何查询指定条件的数据？"
-                elif "INSERT" in sql.upper():
-                    question = "如何插入新数据？"
-                elif "UPDATE" in sql.upper():
-                    question = "如何更新现有数据？"
-                elif "DELETE" in sql.upper():
-                    question = "如何删除满足条件的数据？"
-                elif "CREATE" in sql.upper():
-                    question = "如何创建数据库对象？"
-                elif "ALTER" in sql.upper():
-                    question = "如何修改数据库对象结构？"
-                else:
-                    question = "如何执行这个SQL语句？"
+            # 如果无法调用大模型，直接抛出异常
+            raise Exception("无法访问大模型服务，请检查连接和配置")
                     
         # 处理问题格式
         question = question.strip()
@@ -255,12 +223,8 @@ SQL: {sql}
             question += "?"
             
     except Exception as e:
-        print(f"[WARNING] 生成问题时出错: {e}")
-        # 如果有注释，使用注释作为问题
-        if comment_info:
-            question = comment_info + "?"
-        else:
-            question = "如何执行这个SQL语句？"
+        print(f"[ERROR] 生成问题时出错: {e}")
+        raise Exception(f"无法为SQL生成问题: {e}")
         
     print(f"[SQL] 生成问题: {question}")
     # 使用标准方式存储问题-SQL对

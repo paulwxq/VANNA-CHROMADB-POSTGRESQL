@@ -6,6 +6,8 @@ import json
 import sys
 import requests
 import pandas as pd
+import argparse
+from pathlib import Path
 from sqlalchemy import create_engine
 
 
@@ -306,113 +308,164 @@ def train_json_question_sql_pairs(json_file):
     except Exception as e:
         print(f" 错误：处理JSON问答训练 - {e}")
 
+def process_training_files(data_path):
+    """处理指定路径下的所有训练文件
+    
+    Args:
+        data_path (str): 训练数据目录路径
+    """
+    print(f"\n===== 扫描训练数据目录: {os.path.abspath(data_path)} =====")
+    
+    # 检查目录是否存在
+    if not os.path.exists(data_path):
+        print(f"错误: 训练数据目录不存在: {data_path}")
+        return False
+    
+    # 初始化统计计数器
+    stats = {
+        "ddl": 0,
+        "documentation": 0,
+        "sql_example": 0,
+        "question_sql_formatted": 0,
+        "question_sql_json": 0
+    }
+    
+    # 递归遍历目录中的所有文件
+    for root, _, files in os.walk(data_path):
+        for file in files:
+            file_path = os.path.join(root, file)
+            file_lower = file.lower()
+            
+            # 根据文件类型调用相应的处理函数
+            try:
+                if file_lower.endswith(".ddl"):
+                    print(f"\n处理DDL文件: {file_path}")
+                    train_ddl_statements(file_path)
+                    stats["ddl"] += 1
+                    
+                elif file_lower.endswith(".md") or file_lower.endswith(".markdown"):
+                    print(f"\n处理文档文件: {file_path}")
+                    train_documentation_blocks(file_path)
+                    stats["documentation"] += 1
+                    
+                elif file_lower.endswith("_pair.json") or file_lower.endswith("_pairs.json"):
+                    print(f"\n处理JSON问答对文件: {file_path}")
+                    train_json_question_sql_pairs(file_path)
+                    stats["question_sql_json"] += 1
+                    
+                elif file_lower.endswith("_sql_pair.sql") or file_lower.endswith("_sql_pairs.sql"):
+                    print(f"\n处理格式化问答对文件: {file_path}")
+                    train_formatted_question_sql_pairs(file_path)
+                    stats["question_sql_formatted"] += 1
+                    
+                elif file_lower.endswith(".sql") and not (file_lower.endswith("_sql_pair.sql") or file_lower.endswith("_sql_pairs.sql")):
+                    print(f"\n处理SQL示例文件: {file_path}")
+                    train_sql_examples(file_path)
+                    stats["sql_example"] += 1
+            except Exception as e:
+                print(f"处理文件 {file_path} 时出错: {e}")
+    
+    # 打印处理统计
+    print("\n===== 训练文件处理统计 =====")
+    print(f"DDL文件: {stats['ddl']}个")
+    print(f"文档文件: {stats['documentation']}个")
+    print(f"SQL示例文件: {stats['sql_example']}个")
+    print(f"格式化问答对文件: {stats['question_sql_formatted']}个")
+    print(f"JSON问答对文件: {stats['question_sql_json']}个")
+    
+    total_files = sum(stats.values())
+    if total_files == 0:
+        print(f"警告: 在目录 {data_path} 中未找到任何可训练的文件")
+        return False
+        
+    return True
+
 def main():
     """主函数：配置和运行训练流程"""
     
-    # 导入os模块
+    # 先导入所需模块
     import os
     import app_config
+    
+    # 解析命令行参数
+    parser = argparse.ArgumentParser(description='训练Vanna NL2SQL模型')
+    parser.add_argument('--data_path', type=str, default=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data'),
+                        help='训练数据目录路径 (默认: training/data)')
+    args = parser.parse_args()
+    
+    # 使用Path对象处理路径以确保跨平台兼容性
+    data_path = Path(args.data_path)
+    
+    # 设置正确的项目根目录路径
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
     # 检查嵌入模型连接
     check_embedding_model_connection()
     
     # 打印ChromaDB相关信息
     try:
-        import mychromadb # type: ignore
+        try:
+            import chromadb
+            chroma_version = chromadb.__version__
+        except ImportError:
+            chroma_version = "未知"
         
         # 尝试查看当前使用的ChromaDB文件
         chroma_file = "chroma.sqlite3"  # 默认文件名
-        chroma_path = app_config.CHROMADB_PATH if hasattr(app_config, 'CHROMADB_PATH') else chroma_file
-
-        # 修正路径以便os.path.exists和os.path.getsize能正确工作
-        # 如果CHROMADB_PATH是目录，则在其下查找chroma.sqlite3
-        if os.path.isdir(chroma_path):
-            db_file_path = os.path.join(chroma_path, "chroma.sqlite3")
-        else: # 如果CHROMADB_PATH直接是文件，则使用它
-            db_file_path = chroma_path
+        
+        # 使用项目根目录作为ChromaDB文件路径
+        db_file_path = os.path.join(project_root, chroma_file)
 
         if os.path.exists(db_file_path):
             file_size = os.path.getsize(db_file_path) / 1024  # KB
             print(f"\n===== ChromaDB数据库: {os.path.abspath(db_file_path)} (大小: {file_size:.2f} KB) =====")
         else:
             print(f"\n===== 未找到ChromaDB数据库文件于: {os.path.abspath(db_file_path)} =====")
-            if chroma_path != chroma_file:
-                 print(f"     请检查 app_config.py 中的 CHROMADB_PATH 设置: {chroma_path}")
             
-        # 尝试获取ChromaDB版本
-        print(f"===== ChromaDB客户端库版本: {mychromadb.__version__ if hasattr(mychromadb, '__version__') else '未知'} =====\n")
-    except ImportError:
-        print("\n===== 未安装ChromaDB客户端库 (mychromadb)，无法获取详细信息 =====")
+        # 打印ChromaDB版本
+        print(f"===== ChromaDB客户端库版本: {chroma_version} =====\n")
     except Exception as e:
         print(f"\n===== 无法获取ChromaDB信息: {e} =====\n")
     
-    # 配置基础路径
-    BASE_PATH = r"D:\TechDoc\NL2SQL\RetailStoreStarSchemaDataset"  # Windows 路径格式
-
-    # 配置训练文件路径
-    TRAINING_FILES = {
-        "ddl_1": os.path.join(BASE_PATH, "create_table.ddl"),
-        "doc_1": os.path.join(BASE_PATH, "table_detail.md"),
-        "json_qs_1": os.path.join(BASE_PATH, "question_sql_pair.json"),
-        "sql_1": os.path.join(BASE_PATH, "sql_example.sql"),
-    }
-
-    # 添加DDL语句训练
-    train_ddl_statements(TRAINING_FILES["ddl_1"])
-
-    #添加文档结构训练
-    train_documentation_blocks(TRAINING_FILES["doc_1"])
-
-    # 添加SQL示例训练
-    train_sql_examples(TRAINING_FILES["sql_1"])
+    # 处理训练文件
+    process_successful = process_training_files(data_path)
     
-    # 添加JSON格式问答对训练
-    train_json_question_sql_pairs(TRAINING_FILES["json_qs_1"])
-    
-    # 训练结束，刷新和关闭批处理器
-    print("\n===== 训练完成，处理剩余批次 =====")
-    flush_training()
-    shutdown_trainer()
-    
-    # 验证数据是否成功写入
-    print("\n===== 验证训练数据 =====")
-    from vanna_llm_factory import create_vanna_instance
-    vn = create_vanna_instance()
-    
-    # 根据向量数据库类型执行不同的验证逻辑
-    # 由于已确定只使用ChromaDB，简化这部分逻辑
-    try:
-        training_data = vn.get_training_data()
-        if training_data is not None and not training_data.empty:
-            # get_training_data 内部通常会打印数量，这里可以补充一个总结
-            print(f"已从ChromaDB中检索到 {len(training_data)} 条训练数据进行验证。")
-            # 如果需要更详细的分类计数，且vn.get_training_data()不提供，
-            # 可能需要直接与ChromaDB交互或依赖vanna的实现细节，
-            # 但通常get_training_data()返回的DataFrame已包含类型信息。
-            # 例如，如果DataFrame有 'type' 列:
-            # if 'type' in training_data.columns:
-            #     type_counts = training_data['type'].value_counts()
-            #     print("按类型统计的训练数据:")
-            #     for type_name, count in type_counts.items():
-            #         print(f" - {type_name}: {count}条")
-            # else:
-            #     print("未在返回数据中找到明确的'type'列进行分类统计。")
-        elif training_data is not None and training_data.empty:
-             print("在ChromaDB中未找到任何训练数据。")
-        else: # training_data is None
-            print("无法从Vanna获取训练数据 (可能返回了None)。请检查连接和Vanna实现。")
+    if process_successful:
+        # 训练结束，刷新和关闭批处理器
+        print("\n===== 训练完成，处理剩余批次 =====")
+        flush_training()
+        shutdown_trainer()
+        
+        # 验证数据是否成功写入
+        print("\n===== 验证训练数据 =====")
+        from vanna_llm_factory import create_vanna_instance
+        vn = create_vanna_instance()
+        
+        # 根据向量数据库类型执行不同的验证逻辑
+        # 由于已确定只使用ChromaDB，简化这部分逻辑
+        try:
+            training_data = vn.get_training_data()
+            if training_data is not None and not training_data.empty:
+                # get_training_data 内部通常会打印数量，这里可以补充一个总结
+                print(f"已从ChromaDB中检索到 {len(training_data)} 条训练数据进行验证。")
+            elif training_data is not None and training_data.empty:
+                 print("在ChromaDB中未找到任何训练数据。")
+            else: # training_data is None
+                print("无法从Vanna获取训练数据 (可能返回了None)。请检查连接和Vanna实现。")
 
-    except Exception as e:
-        print(f"验证训练数据失败: {e}")
-        print("请检查ChromaDB连接和表结构。")
+        except Exception as e:
+            print(f"验证训练数据失败: {e}")
+            print("请检查ChromaDB连接和表结构。")
+    else:
+        print("\n===== 未能找到或处理任何训练文件，训练过程终止 =====")
     
     # 输出embedding模型信息
     print("\n===== Embedding模型信息 =====")
-    print(f"模型名称: {app_config.EMBEDDING_CONFIG['model_name']}")
-    print(f"向量维度: {app_config.EMBEDDING_CONFIG['embedding_dimension']}")
-    print(f"API服务: {app_config.EMBEDDING_CONFIG['base_url']}")
-    # 直接打印ChromaDB路径信息
-    chroma_display_path = app_config.CHROMADB_PATH if hasattr(app_config, 'CHROMADB_PATH') else "chroma.sqlite3 (默认路径)"
+    print(f"模型名称: {app_config.EMBEDDING_CONFIG.get('model_name')}")
+    print(f"向量维度: {app_config.EMBEDDING_CONFIG.get('embedding_dimension')}")
+    print(f"API服务: {app_config.EMBEDDING_CONFIG.get('base_url')}")
+    # 打印ChromaDB路径信息
+    chroma_display_path = os.path.abspath(project_root)
     print(f"向量数据库: ChromaDB ({chroma_display_path})")
     print("===== 训练流程完成 =====\n")
 

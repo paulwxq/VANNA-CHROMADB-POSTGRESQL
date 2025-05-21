@@ -12,27 +12,28 @@ DEEPSEEK_CONFIG = {
     "api_key": os.getenv("DEEPSEEK_API_KEY"),  # 从环境变量读取API密钥
     "model": "deepseek-reasoner",  # deepseek-chat, deepseek-reasoner
     "allow_llm_to_see_data": True,
-    "temperature": 0.6,
+    "temperature": 0.7,
     "n_results_sql": 6,
     "n_results_documentation": 6,
     "n_results_ddl": 6,
     "language": "Chinese",
-    "use_ollama_embedding": True,  # 自定义，如果是false，则使用chromadb自带embedding
     "enable_thinking": False  # 自定义，是否支持流模式
 }
 
 
 # Qwen模型配置
 QWEN_CONFIG = {
-    "api_key": os.getenv("QWEN_API_KEY"),  # 从环境变量读取API密钥
+    # 注意：必须设置有效的API密钥才能连接到LLM服务
+    # 方法1：在.env文件中设置QWEN_API_KEY=您的API密钥
+    # 方法2：直接在下面设置api_key值（不推荐在生产环境中使用）
+    "api_key": os.getenv("QWEN_API_KEY"),  
     "model": "qwen-plus",
     "allow_llm_to_see_data": True,
-    "temperature": 0.6,
+    "temperature": 0.7,
     "n_results_sql": 6,
     "n_results_documentation": 6,
     "n_results_ddl": 6,
     "language": "Chinese",
-    "use_ollama_embedding": True, #自定义，如果是false，则使用chromadb自带embedding。
     "enable_thinking": False #自定义，是否支持流模式，仅qwen3模型。
 }
 #qwen3-30b-a3b
@@ -41,7 +42,7 @@ QWEN_CONFIG = {
 #qwen-plus
 
 EMBEDDING_CONFIG = {
-    "model_name": "BAAI/bge-large-zh-v1.5",
+    "model_name": "BAAI/bge-m3",
     "api_key": os.getenv("EMBEDDING_API_KEY"),
     "base_url": os.getenv("EMBEDDING_BASE_URL"),
     "embedding_dimension": 1024
@@ -50,18 +51,17 @@ EMBEDDING_CONFIG = {
 
 # 应用数据库连接配置 (业务数据库)
 APP_DB_CONFIG = {
-    "host": "192.168.67.10",
+    "host": "192.168.67.1",
     "port": 5432,
-    "dbname": "retail_dw",
+    "dbname": "bank_db",
     "user": os.getenv("APP_DB_USER"),
     "password": os.getenv("APP_DB_PASSWORD")
 }
 
 # ChromaDB配置
-CHROMADB_PATH = "."  
+# CHROMADB_PATH = "."  
 
 # 批处理配置
 BATCH_PROCESSING_ENABLED = True
 BATCH_SIZE = 10
 MAX_WORKERS = 4
-EMBEDDING_CACHE_SIZE = 100

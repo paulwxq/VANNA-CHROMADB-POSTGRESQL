@@ -34,29 +34,36 @@ class EmbeddingFunction:
         return (np.array(vector) / norm).tolist()
     
 
-    def __call__(self, texts) -> List[List[float]]:
+    def __call__(self, input) -> List[List[float]]:
         """
         为文本列表生成嵌入向量
         
         Args:
-            texts: 要嵌入的文本或文本列表
+            input: 要嵌入的文本或文本列表
             
         Returns:
             List[List[float]]: 嵌入向量列表
         """
-        if not isinstance(texts, list):
-            texts = [texts]
+        if not isinstance(input, list):
+            input = [input]
             
         embeddings = []
-        for text in texts:
+        for text in input:
             payload = {
-                "model": self.model,
+                "model": self.model_name,
                 "input": text,
                 "encoding_format": "float"
             }
             
             try:
-                response = requests.post(self.url, json=payload, headers=self.headers)
+                # 修复URL拼接问题
+                url = self.base_url
+                if not url.endswith("/embeddings"):
+                    url = url.rstrip("/")  # 移除尾部斜杠，避免双斜杠
+                    if not url.endswith("/v1/embeddings"):
+                        url = f"{url}/embeddings"
+                
+                response = requests.post(url, json=payload, headers=self.headers)
                 response.raise_for_status()
                 
                 result = response.json()
@@ -110,7 +117,11 @@ class EmbeddingFunction:
         while retries <= self.max_retries:
             try:
                 # 发送API请求
-                url = f"{self.base_url}/embeddings"
+                url = self.base_url
+                if not url.endswith("/embeddings"):
+                    url = url.rstrip("/")  # 移除尾部斜杠，避免双斜杠
+                    if not url.endswith("/v1/embeddings"):
+                        url = f"{url}/embeddings"
                 print(f"请求URL: {url}")
                 
                 response = requests.post(

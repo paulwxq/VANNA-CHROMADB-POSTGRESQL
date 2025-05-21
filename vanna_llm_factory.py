@@ -6,6 +6,7 @@ from customqianwen.Custom_QianwenAI_chat import QianWenAI_Chat
 from customdeepseek.custom_deepseek_chat import DeepSeekChat
 import app_config 
 from embedding_function import get_embedding_function
+import os
 
 class Vanna_Qwen_ChromaDB(ChromaDB_VectorStore, QianWenAI_Chat):
     def __init__(self, config=None):
@@ -36,9 +37,23 @@ def create_vanna_instance(config_module=None):
     if model_type == "deepseek":
         config = config_module.DEEPSEEK_CONFIG.copy()
         print(f"创建DeepSeek模型实例，使用模型: {config['model']}")
+        # 检查API密钥
+        if not config.get("api_key"):
+            print(f"\n错误: DeepSeek API密钥未设置或为空")
+            print(f"请在.env文件中设置DEEPSEEK_API_KEY环境变量")
+            print(f"无法继续执行，程序退出\n")
+            import sys
+            sys.exit(1)
     elif model_type == "qwen":
         config = config_module.QWEN_CONFIG.copy()
         print(f"创建Qwen模型实例，使用模型: {config['model']}")
+        # 检查API密钥
+        if not config.get("api_key"):
+            print(f"\n错误: Qwen API密钥未设置或为空")
+            print(f"请在.env文件中设置QWEN_API_KEY环境变量")
+            print(f"无法继续执行，程序退出\n")
+            import sys
+            sys.exit(1)
     else:
         raise ValueError(f"不支持的模型类型: {model_type}") 
     
@@ -47,8 +62,10 @@ def create_vanna_instance(config_module=None):
     config["embedding_function"] = embedding_function
     print(f"已配置使用 EMBEDDING_CONFIG 中的嵌入模型: {config_module.EMBEDDING_CONFIG['model_name']}, 维度: {config_module.EMBEDDING_CONFIG['embedding_dimension']}")
     
-    config["path"] = config_module.CHROMADB_PATH
-    print(f"已配置使用ChromaDB作为向量数据库，路径：{config_module.CHROMADB_PATH}")
+    # 设置ChromaDB路径为项目根目录
+    project_root = os.path.dirname(os.path.abspath(__file__))
+    config["path"] = project_root
+    print(f"已配置使用ChromaDB作为向量数据库，路径：{project_root}")
     
     vn = None
     if model_type == "deepseek":
