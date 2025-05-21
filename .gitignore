@@ -26,6 +26,8 @@ Thumbs.db
 # 忽略 node_modules（前端项目）
 node_modules/
 
+/training/data/
+
 
 # 忽略所有一级UUID目录
 /[0-9a-fA-F]*-[0-9a-fA-F]*-[0-9a-fA-F]*-[0-9a-fA-F]*-[0-9a-fA-F]*/

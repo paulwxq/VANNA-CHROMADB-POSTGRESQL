@@ -99,3 +99,16 @@ class DeepSeekChat(VannaBase):
         sql = sql.replace("\\_", "_")
         
         return sql
+    
+    # 为了解决通过sql生成question时，question是英文的问题。
+    def generate_question(self, sql: str, **kwargs) -> str:
+        # 这里可以自定义提示词/逻辑
+        prompt = [
+            self.system_message(
+                "请你根据下方SQL语句推测用户的业务提问，只返回清晰的自然语言问题，问题要使用中文，不要包含任何解释或SQL内容，也不要出现表名。"
+            ),
+            self.user_message(sql)
+        ]
+        response = self.submit_prompt(prompt, **kwargs)
+        # 你也可以在这里对response做后处理
+        return response

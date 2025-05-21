@@ -176,50 +176,12 @@ def train_sql_example(sql: str):
     """训练单个SQL示例，通过SQL生成相应的问题"""
     print(f"[SQL] Training on SQL:\n{sql}")
     
-    # 从SQL提取注释信息
-    comment_info = None
     try:
-        if "--" in sql:
-            comment_parts = sql.split("--")
-            comment_info = comment_parts[1].split("\n")[0].strip()
-    except Exception as e:
-        # 如果提取注释失败，不报错，只记录日志
-        print(f"[INFO] 提取SQL注释信息时出现问题: {e}")
-    
-    # 使用大模型生成问题
-    try:
-        # 准备提示词
-        if comment_info:
-            prompt = f"""
-根据以下SQL及其注释，生成一个简洁、明确的中文问题，问题应该能够反映SQL的功能或目的。
-注释信息: {comment_info}
-SQL: {sql}
-生成的问题需要是一个问句，以问号结尾。
-"""
-        else:
-            prompt = f"""
-根据以下SQL，生成一个简洁、明确的中文问题，问题应该能够反映SQL的功能或目的。
-SQL: {sql}
-生成的问题需要是一个问句，以问号结尾。
-"""
+        # 直接调用generate_question方法
+        question = vn.generate_question(sql=sql)
         
-        # 使用vn对象调用大模型生成问题
-        if hasattr(vn, 'generate_question_for_sql') and callable(getattr(vn, 'generate_question_for_sql')):
-            # 如果有专门的方法，使用它
-            question = vn.generate_question_for_sql(sql=sql, comment=comment_info)
-        elif hasattr(vn, 'llm') and hasattr(vn.llm, 'generate'):
-            # 尝试通过llm属性调用生成方法
-            question = vn.llm.generate(prompt)
-        elif hasattr(vn, 'generate_text'):
-            # 尝试使用generate_text方法
-            question = vn.generate_text(prompt)
-        else:
-            # 如果无法调用大模型，直接抛出异常
-            raise Exception("无法访问大模型服务，请检查连接和配置")
-                    
-        # 处理问题格式
         question = question.strip()
-        if not question.endswith("?"):
+        if not question.endswith("?") and not question.endswith("？"):
             question += "?"
             
     except Exception as e:
