@@ -402,30 +402,66 @@ def main():
     # 检查嵌入模型连接
     check_embedding_model_connection()
     
-    # 打印ChromaDB相关信息
+    # 打印向量数据库相关信息
     try:
-        try:
-            import chromadb
-            chroma_version = chromadb.__version__
-        except ImportError:
-            chroma_version = "未知"
+        # 检查向量数据库类型
+        vector_db_type = app_config.VECTOR_DB_TYPE.lower()
         
-        # 尝试查看当前使用的ChromaDB文件
-        chroma_file = "chroma.sqlite3"  # 默认文件名
-        
-        # 使用项目根目录作为ChromaDB文件路径
-        db_file_path = os.path.join(project_root, chroma_file)
-
-        if os.path.exists(db_file_path):
-            file_size = os.path.getsize(db_file_path) / 1024  # KB
-            print(f"\n===== ChromaDB数据库: {os.path.abspath(db_file_path)} (大小: {file_size:.2f} KB) =====")
-        else:
-            print(f"\n===== 未找到ChromaDB数据库文件于: {os.path.abspath(db_file_path)} =====")
+        if vector_db_type == "chromadb":
+            # ChromaDB相关检查逻辑
+            try:
+                import chromadb
+                chroma_version = chromadb.__version__
+            except ImportError:
+                chroma_version = "未知"
             
-        # 打印ChromaDB版本
-        print(f"===== ChromaDB客户端库版本: {chroma_version} =====\n")
+            # 尝试查看当前使用的ChromaDB文件
+            chroma_file = "chroma.sqlite3"  # 默认文件名
+            
+            # 使用项目根目录作为ChromaDB文件路径
+            db_file_path = os.path.join(project_root, chroma_file)
+
+            if os.path.exists(db_file_path):
+                file_size = os.path.getsize(db_file_path) / 1024  # KB
+                print(f"\n===== ChromaDB数据库: {os.path.abspath(db_file_path)} (大小: {file_size:.2f} KB) =====")
+            else:
+                print(f"\n===== 未找到ChromaDB数据库文件于: {os.path.abspath(db_file_path)} =====")
+                
+            # 打印ChromaDB版本
+            print(f"===== ChromaDB客户端库版本: {chroma_version} =====\n")
+        
+        elif vector_db_type == "pgvector":
+            # PgVector相关检查逻辑
+            try:
+                import psycopg
+                from sqlalchemy import create_engine, text
+                
+                # 从配置中获取连接信息
+                db_cfg = app_config.PGVECTOR_CONFIG
+                connection_string = (
+                    f"postgresql://{db_cfg['user']}:{db_cfg['password']}@"
+                    f"{db_cfg['host']}:{db_cfg['port']}/{db_cfg['dbname']}"
+                )
+                
+                # 尝试连接数据库
+                engine = create_engine(connection_string)
+                with engine.connect() as conn:
+                    # 检查pgvector扩展是否已安装
+                    result = conn.execute(text("SELECT * FROM pg_extension WHERE extname = 'vector'")).fetchone()
+                    if result:
+                        print(f"\n===== PgVector数据库连接成功 =====")
+                        print(f"数据库: {db_cfg['host']}:{db_cfg['port']}/{db_cfg['dbname']}")
+                        print(f"pgvector扩展已安装")
+                    else:
+                        print(f"\n===== 警告: PgVector数据库连接成功，但未找到vector扩展 =====")
+                        print(f"请在PostgreSQL中安装pgvector扩展: CREATE EXTENSION vector;")
+            except Exception as e:
+                print(f"\n===== 无法连接到PgVector数据库: {e} =====")
+                print(f"请检查app_config.py中的PGVECTOR_CONFIG配置")
+        else:
+            print(f"\n===== 未知的向量数据库类型: {vector_db_type} =====")
     except Exception as e:
-        print(f"\n===== 无法获取ChromaDB信息: {e} =====\n")
+        print(f"\n===== 无法获取向量数据库信息: {e} =====\n")
     
     # 处理训练文件
     process_successful = process_training_files(data_path)

@@ -1,7 +1,9 @@
+# 给dataops 对话助手返回结果
 from vanna.flask import VannaFlaskApp
 from vanna_llm_factory import create_vanna_instance
 from flask import request, jsonify
 import pandas as pd
+from common import result
 
 vn = create_vanna_instance()
 
@@ -18,13 +20,13 @@ app = VannaFlaskApp(
     debug=True
 )
 
-# 添加一个API，给前端使用：
+# 给dataops对话助手添加一个API，给前端使用：
 @app.flask_app.route('/api/v0/ask', methods=['POST'])
 def ask_full():
     req = request.get_json(force=True)
     question = req.get("question", None)
     if not question:
-        return jsonify({"type": "error", "error": "No question provided"}), 400
+        return jsonify(result.failed(message="未提供问题", code=400)), 400
 
     sql, df, fig = vn.ask(
         question=question,
@@ -38,11 +40,11 @@ def ask_full():
         rows = df.head(1000).to_dict(orient="records")
         columns = list(df.columns)
 
-    return jsonify({
+    return jsonify(result.success(data={
         "sql": sql,
         "rows": rows,
         "columns": columns
-    })
+    }))
 
 
 print("正在启动Flask应用...")

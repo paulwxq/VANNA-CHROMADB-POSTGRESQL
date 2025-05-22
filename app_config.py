@@ -30,9 +30,7 @@ QWEN_CONFIG = {
     "model": "qwen-plus",
     "allow_llm_to_see_data": True,
     "temperature": 0.7,
-    "n_results_sql": 6,
-    "n_results_documentation": 6,
-    "n_results_ddl": 6,
+    "n_results": 6,
     "language": "Chinese",
     "enable_thinking": False #自定义，是否支持流模式，仅qwen3模型。
 }
@@ -60,6 +58,20 @@ APP_DB_CONFIG = {
 
 # ChromaDB配置
 # CHROMADB_PATH = "."  
+
+# 向量数据库类型， chromadb 或 pgvector
+VECTOR_DB_TYPE = "pgvector"
+
+# PgVector数据库连接配置 (向量数据库，独立于业务数据库)
+PGVECTOR_CONFIG = {
+    "host": "192.168.67.1",
+    "port": 5432,
+    "dbname": "pgvector_store",
+    "user": "postgres",
+    "password": "postgres"
+}
+
+#PGVECTOR_TABLE = "langchain_pg_embedding"  # PgVector表名
 
 # 批处理配置
 BATCH_PROCESSING_ENABLED = True

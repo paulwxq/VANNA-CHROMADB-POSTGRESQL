@@ -1,86 +1,87 @@
 """
-Vanna LLM 工厂文件，专注于 ChromaDB 并简化配置。
+Vanna LLM 工厂文件，支持 ChromaDB 和 PGVector，自动组合 LLM 和 VectorStore。
 """
-from vanna.chromadb import ChromaDB_VectorStore  # 从 Vanna 系统获取
+from vanna.chromadb import ChromaDB_VectorStore
 from customqianwen.Custom_QianwenAI_chat import QianWenAI_Chat
 from customdeepseek.custom_deepseek_chat import DeepSeekChat
-import app_config 
+from custompgvector.custom_pgvector import PG_VectorStore
 from embedding_function import get_embedding_function
+import app_config
 import os
 
-class Vanna_Qwen_ChromaDB(ChromaDB_VectorStore, QianWenAI_Chat):
-    def __init__(self, config=None):
-        ChromaDB_VectorStore.__init__(self, config=config)
-        QianWenAI_Chat.__init__(self, config=config)
-
-class Vanna_DeepSeek_ChromaDB(ChromaDB_VectorStore, DeepSeekChat):
-    def __init__(self, config=None):
-        ChromaDB_VectorStore.__init__(self, config=config)
-        DeepSeekChat.__init__(self, config=config)
+def CustomVannaDynamic(vectorstore_cls, llm_cls):
+    class _CustomVanna(vectorstore_cls, llm_cls):
+        def __init__(self, config=None):
+            vectorstore_cls.__init__(self, config=config)
+            llm_cls.__init__(self, config=config)
+    _CustomVanna.__name__ = f"CustomVanna_{vectorstore_cls.__name__}_{llm_cls.__name__}"
+    return _CustomVanna
 
 def create_vanna_instance(config_module=None):
     """
-    工厂函数：创建并初始化一个Vanna实例 (LLM 和 ChromaDB 特定版本)
-    
-    Args:
-        config_module: 配置模块，默认为None时使用 app_config
-        
-    Returns:
-        初始化后的Vanna实例
+    工厂函数：根据配置创建并初始化一个Vanna实例，支持 ChromaDB 和 PGVector。
     """
     if config_module is None:
         config_module = app_config
 
     model_type = config_module.MODEL_TYPE.lower()
-    
-    config = {}
+    vector_db_type = getattr(config_module, "VECTOR_DB_TYPE", "chromadb").lower()
+
+    # 选择 LLM 类
     if model_type == "deepseek":
         config = config_module.DEEPSEEK_CONFIG.copy()
-        print(f"创建DeepSeek模型实例，使用模型: {config['model']}")
-        # 检查API密钥
+        llm_cls = DeepSeekChat
         if not config.get("api_key"):
             print(f"\n错误: DeepSeek API密钥未设置或为空")
             print(f"请在.env文件中设置DEEPSEEK_API_KEY环境变量")
-            print(f"无法继续执行，程序退出\n")
-            import sys
-            sys.exit(1)
+            import sys; sys.exit(1)
+        print(f"创建DeepSeek模型实例，使用模型: {config['model']}")
     elif model_type == "qwen":
         config = config_module.QWEN_CONFIG.copy()
-        print(f"创建Qwen模型实例，使用模型: {config['model']}")
-        # 检查API密钥
+        llm_cls = QianWenAI_Chat
         if not config.get("api_key"):
             print(f"\n错误: Qwen API密钥未设置或为空")
             print(f"请在.env文件中设置QWEN_API_KEY环境变量")
-            print(f"无法继续执行，程序退出\n")
-            import sys
-            sys.exit(1)
+            import sys; sys.exit(1)
+        print(f"创建Qwen模型实例，使用模型: {config['model']}")
     else:
-        raise ValueError(f"不支持的模型类型: {model_type}") 
-    
+        raise ValueError(f"不支持的模型类型: {model_type}")
+
+    # 选择向量数据库类与配置
+    if vector_db_type == "chromadb":
+        vectorstore_cls = ChromaDB_VectorStore
+        project_root = os.path.dirname(os.path.abspath(__file__))
+        config["path"] = project_root
+        print(f"已配置使用ChromaDB作为向量数据库，路径：{project_root}")
+    elif vector_db_type == "pgvector":
+        vectorstore_cls = PG_VectorStore
+        db_cfg = config_module.PGVECTOR_CONFIG
+        connection_string = (
+            f"postgresql://{db_cfg['user']}:{db_cfg['password']}@"
+            f"{db_cfg['host']}:{db_cfg['port']}/{db_cfg['dbname']}"
+        )
+        config["connection_string"] = connection_string
+        print(f"已配置使用PGVector作为向量数据库：{connection_string}")
+    else:
+        raise ValueError(f"不支持的向量数据库类型: {vector_db_type}")
+
+    # 配置embedding function
     embedding_function = get_embedding_function()
-
     config["embedding_function"] = embedding_function
-    print(f"已配置使用 EMBEDDING_CONFIG 中的嵌入模型: {config_module.EMBEDDING_CONFIG['model_name']}, 维度: {config_module.EMBEDDING_CONFIG['embedding_dimension']}")
-    
-    # 设置ChromaDB路径为项目根目录
-    project_root = os.path.dirname(os.path.abspath(__file__))
-    config["path"] = project_root
-    print(f"已配置使用ChromaDB作为向量数据库，路径：{project_root}")
-    
-    vn = None
-    if model_type == "deepseek":
-        vn = Vanna_DeepSeek_ChromaDB(config=config)
-        print("创建DeepSeek+ChromaDB实例")
-    elif model_type == "qwen":
-        vn = Vanna_Qwen_ChromaDB(config=config)
-        print("创建Qwen+ChromaDB实例")
-    
-    if vn is None:
-        raise ValueError(f"未能成功创建Vanna实例，不支持的模型类型: {model_type}")
+    print(f"已配置嵌入模型: {config_module.EMBEDDING_CONFIG['model_name']}, 维度: {config_module.EMBEDDING_CONFIG['embedding_dimension']}")
 
-    vn.connect_to_postgres(**config_module.APP_DB_CONFIG)           
-    print(f"已连接到业务数据库: "
-          f"{config_module.APP_DB_CONFIG['host']}:"
-          f"{config_module.APP_DB_CONFIG['port']}/"
-          f"{config_module.APP_DB_CONFIG['dbname']}")
+    # 动态组合实例化
+    VannaClass = CustomVannaDynamic(vectorstore_cls, llm_cls)
+    vn = VannaClass(config=config)
+
+    # 连接业务数据库（用 kwargs，支持各种参数）
+    if hasattr(config_module, "APP_DB_CONFIG"):
+        vn.connect_to_postgres(**config_module.APP_DB_CONFIG)
+        print(f"已连接到业务数据库: "
+              f"{config_module.APP_DB_CONFIG['host']}:"
+              f"{config_module.APP_DB_CONFIG['port']}/"
+              f"{config_module.APP_DB_CONFIG['dbname']}")
+    else:
+        print("未配置业务数据库连接，跳过 connect_to_postgres。")
+
     return vn

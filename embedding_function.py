@@ -33,6 +33,17 @@ class EmbeddingFunction:
             return vector
         return (np.array(vector) / norm).tolist()
     
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        """Langchain接口方法：嵌入多个文档
+        
+        Args:
+            texts: 要嵌入的文本列表
+            
+        Returns:
+            List[List[float]]: 嵌入向量列表
+        """
+        print(f"调用embed_documents方法，处理{len(texts)}个文档")
+        return self.__call__(texts)
 
     def __call__(self, input) -> List[List[float]]:
         """
