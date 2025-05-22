@@ -26,11 +26,16 @@ def check_embedding_model_connection():
     Returns:
         bool: 连接成功返回True，否则终止程序
     """
-    from embedding_function import test_embedding_connection
-
-    print("正在检查嵌入模型连接...")
+    # 尝试导入新工具包
+    try:
+        from utils.conn_tester import test_embedding_connection
+        print("正在使用连接测试工具检查嵌入模型连接...")
+    except ImportError:
+        # 回退到原始实现
+        from embedding_function import test_embedding_connection
+        print("正在检查嵌入模型连接...")
     
-    # 使用专门的测试函数进行连接测试
+    # 使用测试函数进行连接测试
     test_result = test_embedding_connection()
     
     if test_result["success"]:

@@ -309,21 +309,27 @@ def test_embedding_connection() -> dict:
         dict: 测试结果，包括成功/失败状态、错误消息等
     """
     try:
-        # 获取嵌入函数实例
-        embedding_function = get_embedding_function()
-        
-        # 测试连接
-        test_result = embedding_function.test_connection()
-        
-        if test_result["success"]:
-            print(f"嵌入模型连接测试成功!")
-            if "警告" in test_result["message"]:
-                print(test_result["message"])
-                print(f"建议将app_config.py中的EMBEDDING_CONFIG['embedding_dimension']修改为{test_result['actual_dimension']}")
-        else:
-            print(f"嵌入模型连接测试失败: {test_result['message']}")
+        # 尝试导入并使用公共测试工具
+        try:
+            from utils.conn_tester import test_embedding_connection as tester
+            return tester()
+        except ImportError:
+            # 如果导入失败，回退到原始实现
+            # 获取嵌入函数实例
+            embedding_function = get_embedding_function()
             
-        return test_result
+            # 测试连接
+            test_result = embedding_function.test_connection()
+            
+            if test_result["success"]:
+                print(f"嵌入模型连接测试成功!")
+                if "警告" in test_result["message"]:
+                    print(test_result["message"])
+                    print(f"建议将app_config.py中的EMBEDDING_CONFIG['embedding_dimension']修改为{test_result['actual_dimension']}")
+            else:
+                print(f"嵌入模型连接测试失败: {test_result['message']}")
+                
+            return test_result
         
     except Exception as e:
         error_message = f"无法测试嵌入模型连接: {str(e)}"
