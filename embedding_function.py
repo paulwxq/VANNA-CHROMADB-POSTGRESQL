@@ -45,6 +45,22 @@ class EmbeddingFunction:
         print(f"调用embed_documents方法，处理{len(texts)}个文档")
         return self.__call__(texts)
 
+    def embed_query(self, text: str) -> List[float]:
+        """Langchain接口方法：嵌入单个查询文本
+        
+        Args:
+            text: 要嵌入的查询文本
+            
+        Returns:
+            List[float]: 嵌入向量
+        """
+        print(f"调用embed_query方法，处理查询文本")
+        embeddings = self.__call__([text])
+        # 返回第一个嵌入向量（因为只有一个文本）
+        if embeddings and len(embeddings) > 0:
+            return embeddings[0]
+        return [0.0] * self.embedding_dimension
+
     def __call__(self, input) -> List[List[float]]:
         """
         为文本列表生成嵌入向量
